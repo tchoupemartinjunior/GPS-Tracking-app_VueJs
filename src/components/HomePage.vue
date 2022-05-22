@@ -83,7 +83,6 @@
           :distParcourue="carState.distParcourue"
           :lat="carState.lat"
           :lng="carState.lng"
-          
           vitesseMoy="80"
           etatMoteur="Allumé"
         >

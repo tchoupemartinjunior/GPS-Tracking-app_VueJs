@@ -7,22 +7,34 @@
     id="map"
   >
     <Marker
-      v-for="vehicle in allVehicles"
-      :key="vehicle.idChauffeur"
+      v-for="vehicle in allCurrentVehicles"
+      :key="vehicle.idVehicule"
       :options="{
         position: vehicle.position,
+
         icon: carIcon,
       }"
       @click="showInfoWindow = true"
     >
-      <Polyline :options="carPath" />
+      <Polyline v-if="afficherTrajet" :options="carPath" />
 
       <InfoWindow
         v-if="showInfoWindow"
         :options="{ position: center, content: 'Hello World!' }"
       >
-        <h6>{{ vehicle.chauffeur }}</h6>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            v-model="afficherTrajet"
+            id="flexCheckDefault"
+          />
+          <label for="flexCheckDefault" class="text-left">Trajectoire</label>
+        </div>
+        <h6>{{ vehicle.nomChauffeur }}</h6>
+
         <p>online: {{ vehicle.online }}</p>
+
         <img src="" />
       </InfoWindow>
     </Marker>
@@ -34,12 +46,12 @@ import { GoogleMap, Marker, InfoWindow, Polyline } from "vue3-google-map";
 import { defineComponent } from "vue";
 import { faCar } from "@fortawesome/free-solid-svg-icons";
 
-//let api = "http://localhost:8080/gpsTest/position.php?action=read";
+const api = "http://localhost:3000/api/vehicules";
 export default defineComponent({
   components: { GoogleMap, Marker, InfoWindow, Polyline },
 
   setup() {
-    // la zone sur laquelle est la map est centré
+    // la zone sur laquelle  la map est centré
     const center = { lat: 48.019023, lng: 0.15784 };
     // parametres de l'icone voiture
     const carIcon = {
@@ -54,91 +66,90 @@ export default defineComponent({
 
     return { center, carIcon };
   },
-  computed: {
+  /*computed: {
     allVehicles: function () {
-      return this.$store.state.allVehicles;
+      return this.fetchResult();
     },
-    /* allPositions: function () {
-      console.log(this.$store.positions.allPositions);
-      return this.$store.positions.allPositions;
-    },*/
   },
+*/
   data() {
     return {
       index: 0,
       onlineVehicles: [],
-      markerDisplayed: false,
+      allCurrentVehicles: [],
+      afficherTrajet: false,
+      //markerDisplayed: false,
       GOOGLE_MAPS_API_KEY: "AIzaSyCd1a9K3CrBCgERlSjWTpIfhTx4_EEWX5I",
       showInfoWindow: false,
-      allPositions: [
-        {
-          lat: 48.019020998475504,
-          lng: 0.15730695295252492,
-        },
-        {
-          lat: 48.0182273154203,
-          lng: 0.15802144618493977,
-        },
-        {
-          lat: 48.017937148672644,
-          lng: 0.15808524022354825,
-        },
-        {
-          lat: 48.01744215456929,
-          lng: 0.1581490342621567,
-        },
-        {
-          lat: 48.01662284354167,
-          lng: 0.15802144618493977,
-        },
-        {
-          lat: 48.01548773487526,
-          lng: 0.15848076326292077,
-        },
-        {
-          lat: 48.015265831012854,
-          lng: 0.16031803157484473,
-        },
-        {
-          lat: 48.01535221483795,
-          lng: 0.17763710702217328,
-        },
-      ],
 
-      carCoordinates: [
-        { lat: 48.01902, lng: 0.1573069 },
-        { lat: 48.01822731, lng: 0.1580214 },
-        { lat: 48.017937148672644, lng: 0.15808524022354825 },
-        { lat: 48.01492443859049, lng: 0.1616321887701792 },
-      ],
+      allVehicles: [],
+
+      carCoordinatesTest: [{ lat: 48.019023, lng: 0.15784 }],
+      carCoordinates: [],
       carPath: {
         path: this.carCoordinates,
         geodesic: true,
         strokeColor: "#000000",
         strokeOpacity: 1.0,
-        strokeWeight: 3,
+        strokeWeight: 4,
       },
     };
   },
   mounted() {
-    this.getCurrentPosition();
-
-    //this.timer = setInterval(this.getCurrentPosition, 5000);
+    this.fetchResult();
+    //this.getCurrentPosition();
+    //setInterval(this.updateMap, 5000);
+    this.timer = setInterval(this.fetchResult, 10000);
+    if (this.afficherTrajet) {
+      this.timer2 = setInterval(this.updateMap, 60000);
+    }
   },
 
   methods: {
-    getOnlineVehicule() {
-      this.allVehicles.forEach((vehicle) => {
-        this.onlineVehicles.push(vehicle);
-      });
+    async sendGetRequest() {
+      try {
+        const resp = await this.axios.get(api);
+        //console.log(resp.data);
+        return resp.data;
+      } catch (err) {
+        // Handle Error Here
+        console.error(err);
+      }
     },
+    async fetchResult() {
+      let success = await this.sendGetRequest();
+      if (success) {
+        // all vehicles
+        this.allVehicles = success.data;
+        // the last position of the vehicules
+        this.allCurrentVehicles = [];
 
-    getCurrentPosition() {
-      this.carCoordinates = this.allPositions;
-      //this.carCoordinates.push(this.allPositions[this.index]);
-      this.carPath.path = this.carCoordinates;
-      console.log(this.carCoordinates);
+        // get last position of each car
+
+        this.allCurrentVehicles.push(success.data[success.data.length - 1]);
+        var tempcoord = this.allVehicles.map((coord) => {
+          return coord.position;
+        });
+
+        this.carCoordinates = [];
+
+        this.carCoordinates.push(tempcoord);
+
+        this.carPath.path = this.carCoordinates[0];
+
+        console.log(this.carCoordinates[0]);
+        console.log(this.carPath.path);
+        //console.log(this.allCurrentVehicles);
+        //return success.data;
+      } else {
+        // handle error
+        // #
+      }
     },
+    getOnlineVehicule() {},
+
+    getCurrentPosition() {},
+    updateMap() {},
 
     drawCarPath() {},
   },
