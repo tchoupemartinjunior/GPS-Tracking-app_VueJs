@@ -29,12 +29,11 @@
             v-model="afficherTrajet"
             id="flexCheckDefault"
           />
-          <label for="flexCheckDefault" class="text-left">Trajectoire</label>
+          <label for="flexCheckDefault" class="text-left">Trajet</label>
         </div>
-        <h6>{{ vehicle.nomChauffeur }}</h6>
-
-        <p>online: {{ vehicle.online }}</p>
-
+        <h5>{{ vehicle.nomChauffeur }}</h5>
+        <h6>Date: {{ vehicle.dateHeure }}</h6>
+        <h6>Dist. parcourue: {{ vehicle.distParcourue }} km</h6>
         <img src="" />
       </InfoWindow>
     </Marker>
@@ -47,6 +46,7 @@ import { defineComponent } from "vue";
 import { faCar } from "@fortawesome/free-solid-svg-icons";
 
 const api = "http://localhost:3000/api/vehicules";
+
 export default defineComponent({
   components: { GoogleMap, Marker, InfoWindow, Polyline },
 
@@ -62,30 +62,19 @@ export default defineComponent({
       strokeColor: "#ffffff",
       scale: 0.065,
     };
-    // tracé du chemin des véhicules
-
     return { center, carIcon };
   },
-  /*computed: {
-    allVehicles: function () {
-      return this.fetchResult();
-    },
-  },
-*/
+
   data() {
     return {
       index: 0,
-      onlineVehicles: [],
       allCurrentVehicles: [],
       afficherTrajet: false,
-      //markerDisplayed: false,
-      GOOGLE_MAPS_API_KEY: "AIzaSyCd1a9K3CrBCgERlSjWTpIfhTx4_EEWX5I",
+      GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY,
       showInfoWindow: false,
-
       allVehicles: [],
-
-      carCoordinatesTest: [{ lat: 48.019023, lng: 0.15784 }],
       carCoordinates: [],
+
       carPath: {
         path: this.carCoordinates,
         geodesic: true,
@@ -97,22 +86,16 @@ export default defineComponent({
   },
   mounted() {
     this.fetchResult();
-    //this.getCurrentPosition();
-    //setInterval(this.updateMap, 5000);
     this.timer = setInterval(this.fetchResult, 10000);
-    if (this.afficherTrajet) {
-      this.timer2 = setInterval(this.updateMap, 60000);
-    }
+    //this.timer2 = setInterval(this.updateMap, 15000);
   },
 
   methods: {
     async sendGetRequest() {
       try {
         const resp = await this.axios.get(api);
-        //console.log(resp.data);
         return resp.data;
       } catch (err) {
-        // Handle Error Here
         console.error(err);
       }
     },
@@ -121,12 +104,23 @@ export default defineComponent({
       if (success) {
         // all vehicles
         this.allVehicles = success.data;
+        console.log(success.data);
+        // store all position into an array in order to caalculate the total distance covered by the car
+        var allPositions = success.data.map((pos) => {
+          return pos.position;
+        });
+        console.log(allPositions);
         // the last position of the vehicules
         this.allCurrentVehicles = [];
 
         // get last position of each car
 
         this.allCurrentVehicles.push(success.data[success.data.length - 1]);
+        this.allCurrentVehicles.forEach((veh) => {
+          // calcul de la distance parcouru depuis la premiere position jusqua la position actuelle
+          veh["distParcourue"] = this.calcDistParcourue(allPositions).toFixed(2);
+          console.log(veh);
+        });
         var tempcoord = this.allVehicles.map((coord) => {
           return coord.position;
         });
@@ -134,7 +128,6 @@ export default defineComponent({
         this.carCoordinates = [];
 
         this.carCoordinates.push(tempcoord);
-
         this.carPath.path = this.carCoordinates[0];
 
         console.log(this.carCoordinates[0]);
@@ -150,8 +143,45 @@ export default defineComponent({
 
     getCurrentPosition() {},
     updateMap() {},
-
     drawCarPath() {},
+
+    //This function takes in latitude and longitude of two location and returns the distance between them as the crow flies (in km)
+    calcCrow(lat1, lon1, lat2, lon2) {
+      var R = 6371; // km
+      var dLat = this.toRad(lat2 - lat1);
+      var dLon = this.toRad(lon2 - lon1);
+      lat1 = this.toRad(lat1);
+      lat2 = this.toRad(lat2);
+
+      var a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      var d = R * c;
+      console.log(d);
+      return d;
+    },
+
+    // Converts numeric degrees to radians
+    toRad(Value) {
+      return (Value * Math.PI) / 180;
+    },
+
+    calcDistParcourue(tab) {
+      var distParcourue = 0;
+      for (var i = 0; i < tab.length; i++) {
+        if (i == tab.length - 1) {
+          return distParcourue;
+        } else {
+          distParcourue += this.calcCrow(
+            tab[i].lat,
+            tab[i].lng,
+            tab[i + 1].lat,
+            tab[i + 1].lng
+          );
+        }
+      }
+    },
   },
 });
 </script>

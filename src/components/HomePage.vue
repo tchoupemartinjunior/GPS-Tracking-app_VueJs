@@ -99,6 +99,7 @@
 import MapNav from "@/components/MapNav.vue";
 import MapDisplay from "@/components/MapDisplay.vue";
 
+const api = "http://localhost:3000/api/vehicules";
 export default {
   name: "HomePage",
 
@@ -107,15 +108,12 @@ export default {
     MapDisplay,
   },
   props: {},
-  computed: {
-    allVehicles: function () {
-      return this.$store.state.allVehicles;
-    },
-  },
   data() {
     return {
       onlineVehicles: [],
       offlineVehicles: [],
+      allCurrentVehicles: [],
+      carCoordinates: [],
       nbOnline: null,
       nbOffline: null,
       currentVehicle: new Object(),
@@ -130,18 +128,53 @@ export default {
   },
 
   mounted() {
-    this.getOnlineVehicle();
-    this.getOfflineVehicle();
+    this.fetchResult();
   },
 
   methods: {
+    async sendGetRequest() {
+      try {
+        const resp = await this.axios.get(api);
+        return resp.data;
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    async fetchResult() {
+      let success = await this.sendGetRequest();
+      if (success) {
+        // all vehicles
+        this.allVehicles = success.data;
+        // the last position of the vehicules
+        this.allCurrentVehicles = [];
+
+        // get last position of each car
+
+        this.allCurrentVehicles.push(success.data[success.data.length - 1]);
+        this.allCurrentVehicles.forEach((veh) => {
+          // calcul de la distance parcouru depuis la premiere position jusqua la position actuelle
+          veh["distParcourue"] = this.calcCrow(
+            success.data[0].position.lat,
+            success.data[0].position.lng,
+            veh.position.lat,
+            veh.position.lng
+          ).toFixed(1);
+          console.log(veh);
+        });
+        var tempcoord = this.allVehicles.map((coord) => {
+          return coord.position;
+        });
+
+        this.carCoordinates = [];
+
+        this.carCoordinates.push(tempcoord);
+      } else {
+        // handle error
+        // #
+      }
+    },
     getOnlineVehicle() {
-      this.allVehicles.forEach((vehicle) => {
-        if (vehicle.online) {
-          this.onlineVehicles.push(vehicle);
-          // console.log(vehicle);
-        }
-      });
+      this.onlineVehicles = this.allVehicles;
       this.nbOnline = this.onlineVehicles.length;
     },
 
@@ -157,7 +190,7 @@ export default {
 
     getCurrentVehicle(id) {
       this.allVehicles.forEach((vehicle) => {
-        if (vehicle.id == id) {
+        if (vehicle.idVehicule == id) {
           this.currentVehicle = vehicle;
           console.log(this.currentVehicle);
           this.searchKeyword = vehicle.chauffeur; //affichage du meme nom dans la barre de recherche
